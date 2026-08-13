@@ -289,6 +289,20 @@
   .pk-badge.pk-dated{background:rgba(201,165,74,.15); color:var(--gold-soft); border:1px solid rgba(201,165,74,.35);}
   .pk-badge.pk-unavailable{background:rgba(224,117,122,.13); color:var(--coral); border:1px solid rgba(224,117,122,.3);}
 
+  /* Transportation cost — city cards */
+  .tcard-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:14px; direction:rtl;}
+  .tcard{
+    background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:18px;
+    display:flex; flex-direction:column; gap:10px; text-align:right;
+  }
+  .tcard-city{font-family:var(--display); font-weight:700; font-size:15px; color:var(--text);}
+  .tcard-cost{display:flex; align-items:baseline; gap:6px; justify-content:flex-start;}
+  .tcard-cost .n{font-family:var(--mono); font-size:22px; font-weight:700; color:var(--gold-soft);}
+  .tcard-cost .u{font-size:11.5px; color:var(--text-dim);}
+
+  /* Code column in live-table: never truncate */
+  table.live-table td.col-code{white-space:normal; word-break:break-word; text-align:center; font-family:var(--mono); font-size:10.5px; color:var(--gold-soft); font-weight:700;}
+
   footer{text-align:center; color:var(--text-dim); font-size:12px; margin-top:50px; font-family:var(--mono);}
 
   @media (max-width:640px){
@@ -367,8 +381,8 @@
         <colgroup>
           <col style="width:11%"><col style="width:9%"><col style="width:5%"><col style="width:4%">
           <col style="width:7%"><col style="width:8%"><col style="width:6%"><col style="width:6%">
-          <col style="width:7%"><col style="width:6%"><col style="width:8%"><col style="width:6%">
-          <col style="width:6%"><col style="width:6%"><col style="width:5%">
+          <col style="width:5%"><col style="width:6%"><col style="width:8%"><col style="width:5%">
+          <col style="width:6%"><col style="width:6%"><col style="width:8%">
         </colgroup>
         <thead><tr id="liveHeadRow"></tr></thead>
         <tbody id="liveBody"></tbody>
@@ -380,15 +394,19 @@
     <div class="sec-title"><div class="bar"></div><h2>مواعيد استلام السيارات</h2><span class="count" id="pickupCount">0 سيارة</span></div>
     <div class="table-toolbar">
       <input type="text" id="pickupSearch" placeholder="ابحث بالماركة أو الموديل...">
-      <select id="pickupStatusFilter">
-        <option value="">كل السيارات</option>
-        <option value="available">متاح فقط (فوري + بتاريخ)</option>
-        <option value="ready">فوري فقط</option>
+      <select id="pickupCondFilter">
+        <option value="">كل الحالات</option>
+        <option value="جديد">جديد</option>
+        <option value="مستعمل">مستعمل</option>
+      </select>
+      <select id="pickupDateFilter">
+        <option value="">كل المواعيد</option>
       </select>
     </div>
     <div class="table-scroll" style="max-width:640px; direction:rtl;">
       <table class="live-table" style="direction:rtl;">
         <thead><tr>
+          <th style="text-align:right;">الحالة</th>
           <th style="text-align:right;">الشركة المصنعة</th>
           <th style="text-align:right;">الموديل</th>
           <th style="text-align:right;">السنة</th>
@@ -404,12 +422,7 @@
     <div class="table-toolbar">
       <input type="text" id="transportSearch" placeholder="ابحث عن مدينة...">
     </div>
-    <div class="table-scroll" style="max-width:520px; direction:rtl;">
-      <table class="live-table" style="direction:rtl;">
-        <thead><tr><th style="text-align:right;">المدينة / المنطقة</th><th style="text-align:right;">التكلفة (ر.س)</th></tr></thead>
-        <tbody id="transportBody"></tbody>
-      </table>
-    </div>
+    <div id="transportGrid" class="tcard-grid"></div>
   </div>
 
   <footer>مصدر البيانات: Google Sheets (مباشر) — مع نسخة احتياطية محلية عند تعذّر الاتصال</footer>
@@ -421,22 +434,16 @@ const FALLBACK_CARS = [{"id": 1, "manufacturer": "GAC", "model": "EMPOW", "car":
 const FALLBACK_LIVE = {"headers": ["اللون المتوفر", "Uber", "حالة", "سنة", "Manufacturer", "Model", "القسط", "الدفعة", "قبل الخصم", "الخصم", "إجمالى اول دفعة ", "الدفعة الاخيرة", "مدة العقد", "عداد الممشي ", "Code"], "rows": [["ابيض + رمادي", "uber x", "جديد", 2026.0, "Toyota", "Yaris", 2250.0, 2000.0, 4250, 1000.0, 3250, "30 الف", "36 شهر", 0.0, "NEW1000"], ["ابيض + رمادي", "uber x+مطار", "جديد", 2026.0, "Hyundai", "Elantra", 2900.0, 2000.0, 4900, 1000.0, 3900, "45 الف", "36 شهر", 0.0, "NEW1000"], ["ابيض + رمادي غامق", "uber x+مطار", "جديد", 2026.0, "Kia", "k4", 2950.0, 2000.0, 4950, 1000.0, 3950, "45 الف", "36 شهر", 0.0, "NEW1000"], ["ابيض+اسود ", "uber x+مطار", "جديد", 2027.0, "HAVAL", "Jolian", 2500.0, 2000.0, 4500, 1000.0, 3500, "31 الف", "36 شهر", 0.0, "NEW1000"], ["ابيض+اسود+رمادي +رمادي غامق", "uber x+ مطار+كومفورت", "جديد", 2026.0, "GAC", "EMPOW", 2700.0, 1000.0, 3700, 1000.0, 2700, "38 الف", "36 شهر", 0.0, "NEW1000"], ["ابيض + رمادي", "uber x+مطار", "مستعمل", 2025.0, "MG", "zs", 2300.0, 500.0, 2800, 500.0, 2300, "30 الف", "18 شهر", 5900.0, "vip"], ["ابيض", "uber x+مطار", "مستعمل", 2026.0, "Kia", "k4", 2800.0, 500.0, 3300, 500.0, 2800, "45 الف", "34 شهر", 24000.0, "vip"], ["فضي", "uber x+مطار", "مستعمل", 2026.0, "Kia", "k4", 2950.0, 500.0, 3450, 500.0, 2950, "45 الف", "33 شهر", 30000.0, "vip"], ["ابيض", "uber x+مطار", "مستعمل", 2026.0, "HAVAL", "Jolian", 2500.0, 500.0, 3000, 500.0, 2500, "30 الف", "32شهر", 9200.0, "vip"], ["رمادي غامق", "uber x+مطار", "مستعمل", 2026.0, "HAVAL", "Jolian", 2500.0, 500.0, 3000, 500.0, 2500, "30 الف", "34 شهر", 22000.0, "vip"], ["رمادي غامق", "uber x+مطار", "مستعمل", 2026.0, "Kia", "K3", 2350.0, 500.0, 2850, 500.0, 2350, "30 الف", "33شهر", 35000.0, "vip"], ["ابيض", "uber x+مطار", "مستعمل", 2026.0, "Toyota", "Yaris", 2250.0, 500.0, 2750, 500.0, 2250, "30 الف", "30 شهر", 17212.0, "vip"], ["رمادي", "uber x+مطار", "مستعمل", 2026.0, "GAC", "GS3 EMZOOM", 2550.0, 500.0, 3050, 500.0, 2550, "32 الف", "36 شهر", 6500.0, "vip"]]};
 const FALLBACK_TRANSPORT = [{"city": "جدة", "cost": 1200}, {"city": "المدينه", "cost": 1400}, {"city": "ابها", "cost": 1400}, {"city": "الدمام", "cost": 600}, {"city": "القصيم", "cost": 600}, {"city": "الأحساء", "cost": 600}, {"city": "الهفوف", "cost": 600}];
 const FALLBACK_PICKUP = [
-  {"id":1, "manufacturer":"GAC", "model":"EMPOW", "car":"GAC EMPOW", "year":2026, "pickupDate":"فوري"},
-  {"id":2, "manufacturer":"HAVAL", "model":"Jolian", "car":"HAVAL Jolian", "year":2027, "pickupDate":"غير متاحة"},
-  {"id":3, "manufacturer":"Toyota", "model":"URBAN CRUISER GLX", "car":"Toyota URBAN CRUISER GLX", "year":2025, "pickupDate":"غير متاحة"},
-  {"id":4, "manufacturer":"GAC", "model":"GS3 EMZOOM", "car":"GAC GS3 EMZOOM", "year":2026, "pickupDate":"غير متاحة"},
-  {"id":5, "manufacturer":"Kia", "model":"K3", "car":"Kia K3", "year":2026, "pickupDate":"فوري"},
-  {"id":6, "manufacturer":"Hyundai", "model":"Elantra", "car":"Hyundai Elantra", "year":2026, "pickupDate":"24 أغسطس"},
-  {"id":7, "manufacturer":"Kia", "model":"k4", "car":"Kia k4", "year":2026, "pickupDate":"24 أغسطس"},
-  {"id":8, "manufacturer":"MG", "model":"zs", "car":"MG zs", "year":2025, "pickupDate":"غير متاحة"},
-  {"id":9, "manufacturer":"Hyundai", "model":"Accent", "car":"Hyundai Accent", "year":2026, "pickupDate":"15 سبتمبر"},
-  {"id":10, "manufacturer":"BYD", "model":"QIN Plus", "car":"BYD QIN Plus", "year":2024, "pickupDate":"غير متاحة"},
-  {"id":11, "manufacturer":"Chevrolet", "model":"captiva", "car":"Chevrolet captiva", "year":2026, "pickupDate":"غير متاحة"},
-  {"id":12, "manufacturer":"Toyota", "model":"Yaris", "car":"Toyota Yaris", "year":2026, "pickupDate":"فوري"},
-  {"id":13, "manufacturer":"GAC", "model":"EMPOW", "car":"GAC EMPOW", "year":2026, "pickupDate":"فوري"},
-  {"id":14, "manufacturer":"Jaecoo", "model":"J5", "car":"Jaecoo J5", "year":2027, "pickupDate":"فوري"},
-  {"id":15, "manufacturer":"Toyota", "model":"URBAN CRUISER", "car":"Toyota URBAN CRUISER", "year":2026, "pickupDate":"15 سبتمبر"},
-  {"id":16, "manufacturer":"Ford", "model":"Territory", "car":"Ford Territory", "year":2026, "pickupDate":"15 سبتمبر"}
+  {"condition":"جديد", "year":2026, "manufacturer":"Toyota", "model":"Yaris", "pickupDate":"فوري"},
+  {"condition":"جديد", "year":2026, "manufacturer":"Kia", "model":"k4", "pickupDate":"24 اغسطس"},
+  {"condition":"جديد", "year":2026, "manufacturer":"Hyundai", "model":"Elantra", "pickupDate":"24 اغسطس"},
+  {"condition":"جديد", "year":2027, "manufacturer":"Jaecoo", "model":"J5", "pickupDate":"فوري"},
+  {"condition":"جديد", "year":2026, "manufacturer":"Toyota", "model":"URBAN CRUISER", "pickupDate":"15 سبتمبر"},
+  {"condition":"جديد", "year":2026, "manufacturer":"Ford", "model":"Territory", "pickupDate":"15 سبتمبر"},
+  {"condition":"جديد", "year":2026, "manufacturer":"Hyundai", "model":"Accent", "pickupDate":"15 سبتمبر"},
+  {"condition":"جديد", "year":2026, "manufacturer":"GAC", "model":"EMPOW", "pickupDate":"فوري"},
+  {"condition":"مستعمل", "year":2026, "manufacturer":"Kia", "model":"k4", "pickupDate":"فوري"},
+  {"condition":"مستعمل", "year":2026, "manufacturer":"Kia", "model":"K3", "pickupDate":"فوري"}
 ];
 
 /* ======================= Google Sheet live config ======================= */
@@ -587,12 +594,12 @@ function buildTransportFromRows(rawRows){
 }
 
 function buildPickupFromRows(rawRows){
-  // row0 = headers (ID, Manufacturer, Model, Car, Production year, Pick-up Date), row1+ = data
+  // row0 = headers (حالة, سنة, Manufacturer, Model, الاستلام), row1+ = data
   const out = [];
   for(let r = 1; r < rawRows.length; r++){
     const row = rawRows[r] || [];
-    if(row[1] !== null && row[1] !== undefined && row[1] !== ''){
-      out.push({ id: row[0], manufacturer: row[1], model: row[2], car: row[3], year: row[4], pickupDate: row[5] });
+    if(row[2] !== null && row[2] !== undefined && row[2] !== ''){ // Manufacturer not empty
+      out.push({ condition: row[0], year: row[1], manufacturer: row[2], model: row[3], pickupDate: row[4] });
     }
   }
   return out;
@@ -695,6 +702,7 @@ async function loadLiveData(){
   refreshUberColorChips();
   renderLiveResults();
   renderTransportTable();
+  refreshPickupDateFilter();
   renderPickupTable();
 }
 
@@ -941,7 +949,7 @@ function renderLiveTable(){
       <td>${r[11] ?? '—'}</td>
       <td>${r[12] ?? '—'}</td>
       <td>${fmtNum(r[13])}</td>
-      <td>${r[14] ?? '—'}</td>
+      <td class="col-code" title="${r[14] ?? ''}">${r[14] ?? '—'}</td>
     </tr>
   `).join('');
 }
@@ -1021,12 +1029,12 @@ document.querySelectorAll('.view-btn').forEach(btn => {
   });
 });
 
-/* ======================= Transportation table (3rd tab) ======================= */
+/* ======================= Transportation cards (3rd tab) ======================= */
 let transportSearchTerm = '';
 
 function renderTransportTable(){
-  const body = document.getElementById('transportBody');
-  if(!body) return;
+  const grid = document.getElementById('transportGrid');
+  if(!grid) return;
   let rows = TRANSPORT;
   if(transportSearchTerm){
     const t = transportSearchTerm.toLowerCase();
@@ -1034,14 +1042,14 @@ function renderTransportTable(){
   }
   document.getElementById('transportCount').textContent = `${rows.length} مدينة`;
   if(!rows.length){
-    body.innerHTML = `<tr><td colspan="2" class="empty-state">لا توجد نتائج مطابقة</td></tr>`;
+    grid.innerHTML = `<div class="empty-state">لا توجد نتائج مطابقة</div>`;
     return;
   }
-  body.innerHTML = rows.map(r => `
-    <tr>
-      <td style="text-align:right;">${r.city ?? '—'}</td>
-      <td class="cell-strong" style="text-align:right;">${fmtNum(r.cost)}</td>
-    </tr>
+  grid.innerHTML = rows.map(r => `
+    <div class="tcard">
+      <div class="tcard-city">${r.city ?? '—'}</div>
+      <div class="tcard-cost"><span class="n">${fmtNum(r.cost)}</span><span class="u">ر.س</span></div>
+    </div>
   `).join('');
 }
 
@@ -1052,7 +1060,8 @@ document.getElementById('transportSearch').addEventListener('input', e => {
 
 /* ======================= Pick-up schedule table ======================= */
 let pickupSearchTerm = '';
-let pickupStatusFilter = '';
+let pickupCondTerm = '';
+let pickupDateTerm = '';
 
 function pickupStatusInfo(dateStr){
   const s = String(dateStr || '').trim();
@@ -1061,28 +1070,35 @@ function pickupStatusInfo(dateStr){
   return {cls:'pk-dated', label: s};
 }
 
+function refreshPickupDateFilter(){
+  const sel = document.getElementById('pickupDateFilter');
+  if(!sel) return;
+  const dates = Array.from(new Set(PICKUP.map(r => String(r.pickupDate||'').trim()).filter(Boolean)));
+  const current = pickupDateTerm;
+  sel.innerHTML = '<option value="">كل المواعيد</option>' + dates.map(d => `<option value="${d}"${d===current?' selected':''}>${d}</option>`).join('');
+}
+
 function renderPickupTable(){
   const body = document.getElementById('pickupBody');
   if(!body) return;
   let rows = PICKUP;
-  if(pickupStatusFilter === 'available'){
-    rows = rows.filter(r => pickupStatusInfo(r.pickupDate).cls !== 'pk-unavailable');
-  }else if(pickupStatusFilter === 'ready'){
-    rows = rows.filter(r => pickupStatusInfo(r.pickupDate).cls === 'pk-ready');
-  }
+  if(pickupCondTerm) rows = rows.filter(r => r.condition === pickupCondTerm);
+  if(pickupDateTerm) rows = rows.filter(r => String(r.pickupDate||'').trim() === pickupDateTerm);
   if(pickupSearchTerm){
     const t = pickupSearchTerm.toLowerCase();
-    rows = rows.filter(r => `${r.manufacturer||''} ${r.model||''} ${r.car||''}`.toLowerCase().includes(t));
+    rows = rows.filter(r => `${r.manufacturer||''} ${r.model||''}`.toLowerCase().includes(t));
   }
   document.getElementById('pickupCount').textContent = `${rows.length} سيارة`;
   if(!rows.length){
-    body.innerHTML = `<tr><td colspan="4" class="empty-state">لا توجد نتائج مطابقة</td></tr>`;
+    body.innerHTML = `<tr><td colspan="5" class="empty-state">لا توجد نتائج مطابقة</td></tr>`;
     return;
   }
   body.innerHTML = rows.map(r => {
     const st = pickupStatusInfo(r.pickupDate);
+    const condBadge = r.condition === 'جديد' ? '<span class="badge-new">جديد</span>' : `<span class="badge-used">${r.condition ?? '—'}</span>`;
     return `
     <tr>
+      <td style="text-align:right;">${condBadge}</td>
       <td style="text-align:right;">${r.manufacturer ?? '—'}</td>
       <td style="text-align:right;">${r.model ?? '—'}</td>
       <td style="text-align:right;">${r.year ?? '—'}</td>
@@ -1095,8 +1111,12 @@ document.getElementById('pickupSearch').addEventListener('input', e => {
   pickupSearchTerm = e.target.value;
   renderPickupTable();
 });
-document.getElementById('pickupStatusFilter').addEventListener('change', e => {
-  pickupStatusFilter = e.target.value;
+document.getElementById('pickupCondFilter').addEventListener('change', e => {
+  pickupCondTerm = e.target.value;
+  renderPickupTable();
+});
+document.getElementById('pickupDateFilter').addEventListener('change', e => {
+  pickupDateTerm = e.target.value;
   renderPickupTable();
 });
 
@@ -1119,6 +1139,7 @@ render();
 refreshUberColorChips();
 renderLiveResults();
 renderTransportTable();
+refreshPickupDateFilter();
 renderPickupTable();
 loadLiveData();
 setInterval(loadLiveData, REFRESH_MS);
