@@ -234,9 +234,12 @@
   table.live-table tbody tr:last-child td{border-bottom:1px solid var(--border-soft);}
   .badge-new{color:var(--teal); font-family:var(--mono); font-size:10.5px;}
   .badge-used{color:var(--coral); font-family:var(--mono); font-size:10.5px;}
-  .cell-strong{color:var(--gold-soft); font-family:var(--mono);}
-  .cell-discount{color:var(--coral); font-family:var(--mono); font-weight:700;}
-  .cell-total{color:var(--sky); font-family:var(--mono); font-weight:700;}
+  .cell-strong{font-family:var(--mono);}
+  .cell-discount{font-family:var(--mono); font-weight:700;}
+  .cell-total{font-family:var(--mono); font-weight:700;}
+  table.live-table tbody td.cell-strong{color:var(--gold-soft);}
+  table.live-table tbody td.cell-discount{color:var(--coral);}
+  table.live-table tbody td.cell-total{color:var(--sky);}
 
   /* View toggle (cards/table) */
   .view-toggle{display:flex; gap:4px; background:var(--surface3); border:1px solid var(--border); border-radius:9px; padding:3px; margin-right:auto;}
@@ -475,7 +478,7 @@ async function fetchAllFromAppsScript(){
   if(!res.ok) throw new Error('apps-script-http-' + res.status);
   return res.json(); // {data, live, transport, updatedAt}
 }
-const REFRESH_MS = 60000; // auto refresh every 60s
+const REFRESH_MS = 10000; // auto refresh every 10s
 
 function gvizUrl(sheetName, cbName){
   return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json;responseHandler:${cbName}&headers=0&sheet=${encodeURIComponent(sheetName)}`;
